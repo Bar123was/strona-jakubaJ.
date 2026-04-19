@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel logowania</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #111827;
+            color: #e5e7eb;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: #1f2937;
+            padding: 20px 24px;
+            border-radius: 10px;
+            width: 360px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        }
+        h1 { text-align: center; margin-bottom: 16px; }
+        .buttons { display: flex; justify-content: space-between; margin-bottom: 16px; }
+        button {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .primary { background: #3b82f6; color: white; }
+        .secondary { background: #374151; color: #e5e7eb; }
+        .hidden { display: none; }
+        form { display: flex; flex-direction: column; gap: 8px; }
+        input {
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #4b5563;
+            background: #111827;
+            color: #e5e7eb;
+        }
+        #articles {
+            margin-top: 20px;
+            padding: 15px;
+            background: #0f172a;
+            border-radius: 8px;
+        }
+        #articles a { color: #3b82f6; text-decoration: none; font-weight: 600; }
+        .article-box {
+            background: #1e293b;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Panel</h1>
+
+    <div class="buttons">
+        <button id="btnSignUp" class="primary">Sign up!</button>
+        <button id="btnLogin" class="secondary">Log in!</button>
+    </div>
+
+    <!-- REJESTRACJA -->
+    <form id="signUpForm" class="hidden">
+        <input type="text" id="suLogin" placeholder="Login" required>
+        <input type="password" id="suPassword" placeholder="Hasło" required>
+        <input type="password" id="suPassword2" placeholder="Powtórz hasło" required>
+        <button type="submit" class="primary">Utwórz konto</button>
+    </form>
+
+    <!-- LOGOWANIE -->
+    <form id="loginForm" class="hidden">
+        <input type="text" id="liLogin" placeholder="Login" required>
+        <input type="password" id="liPassword" placeholder="Hasło" required>
+        <button type="submit" class="primary">Zaloguj</button>
+    </form>
+
+    <div id="loggedInfo" class="logged-in hidden"></div>
+    <div id="message" class="message"></div>
+
+    <div id="articles" class="hidden"></div>
+</div>
+
+<script>
+    const btnSignUp = document.getElementById('btnSignUp');
+    const btnLogin = document.getElementById('btnLogin');
+    const signUpForm = document.getElementById('signUpForm');
+    const loginForm = document.getElementById('loginForm');
+    const message = document.getElementById('message');
+    const loggedInfo = document.getElementById('loggedInfo');
+    const articles = document.getElementById('articles');
+
+    function showMessage(text, type = 'error') {
+        message.textContent = text;
+        message.style.color = type === 'success' ? '#22c55e' : '#f97316';
+    }
+
+    function clearMessage() { message.textContent = ''; }
+
+    btnSignUp.onclick = () => {
+        clearMessage();
+        signUpForm.classList.remove('hidden');
+        loginForm.classList.add('hidden');
+        articles.classList.add('hidden');
+    };
+
+    btnLogin.onclick = () => {
+        clearMessage();
+        loginForm.classList.remove('hidden');
+        signUpForm.classList.add('hidden');
+        articles.classList.add('hidden');
+    };
+
+    // REJESTRACJA
+    signUpForm.onsubmit = e => {
+        e.preventDefault();
+        const login = suLogin.value.trim();
+        const p1 = suPassword.value;
+        const p2 = suPassword2.value;
+
+        if (p1 !== p2) return showMessage("Hasła nie są takie same.");
+
+        if (localStorage.getItem("user_" + login))
+            return showMessage("Taki login już istnieje.");
+
+        localStorage.setItem("user_" + login, JSON.stringify({ login, password: p1 }));
+        showMessage("Konto utworzone!", "success");
+        signUpForm.reset();
+    };
+
+    // LOGOWANIE
+    loginForm.onsubmit = e => {
+        e.preventDefault();
+
+        const login = liLogin.value.trim();
+        const pass = liPassword.value;
+
+        const adminLogin = "TOMYADMINIZPODLASIA2012-2013HALLOMYFRIENDS";
+        const adminPass = "PIANINKOJAKUBAADMIN0192837465";
+
+        // ADMIN
+        if (login === adminLogin && pass === adminPass) {
+            loggedInfo.textContent = "ADMIN PANEL";
+            loggedInfo.classList.remove("hidden");
+            loginForm.classList.add("hidden");
+
+            showAdminPanel();
+            return;
+        }
+
+        // NORMAL USER
+        const stored = localStorage.getItem("user_" + login);
+        if (!stored) return showMessage("Nie ma takiego konta.");
+
+        const user = JSON.parse(stored);
+        if (user.password !== pass) return showMessage("Złe hasło.");
+
+        loggedInfo.textContent = "Zalogowany jako: " + login;
+        loggedInfo.classList.remove("hidden");
+        loginForm.classList.add("hidden");
+
+        showUserArticles();
+    };
+
+    // -------------------------
+    // PANEL ADMINA
+    // -------------------------
+    function showAdminPanel() {
+        articles.classList.remove("hidden");
+
+        articles.innerHTML = `
+            <h3>Panel administratora</h3>
+            <input id="newTitle" placeholder="Tytuł artykułu" style="width:100%;padding:8px;margin-top:10px;">
+            <button id="addArt" class="primary" style="margin-top:10px;">Dodaj artykuł</button>
+            <div id="adminList"></div>
+        `;
+
+        loadArticlesAdmin();
+
+        document.getElementById("addArt").onclick = () => {
+            const title = document.getElementById("newTitle").value.trim();
+            if (!title) return;
+
+            let list = JSON.parse(localStorage.getItem("articles") || "[]");
+            list.push(title);
+            localStorage.setItem("articles", JSON.stringify(list));
+
+            sendEmail(title);
+            loadArticlesAdmin();
+        };
+    }
+
+    function loadArticlesAdmin() {
+        const box = document.getElementById("adminList");
+        let list = JSON.parse(localStorage.getItem("articles") || "[]");
+
+        box.innerHTML = list.map((t, i) => `
+            <div class="article-box">
+                ${t}
+                <button onclick="deleteArticle(${i})" class="secondary" style="float:right;">Usuń</button>
+            </div>
+        `).join("");
+    }
+
+    window.deleteArticle = function(i) {
+        let list = JSON.parse(localStorage.getItem("articles") || "[]");
+        list.splice(i, 1);
+        localStorage.setItem("articles", JSON.stringify(list));
+        loadArticlesAdmin();
+    };
+
+    // -------------------------
+    // UŻYTKOWNIK
+    // -------------------------
+    function showUserArticles() {
+        articles.classList.remove("hidden");
+
+        let list = JSON.parse(localStorage.getItem("articles") || "[]");
+
+        if (list.length === 0) {
+            articles.innerHTML = `
+                <h3>Artykuły</h3>
+                <p>nic jeszcze nie dodano odwiedź mój kanał YouTube</p>
+                <a href="https://www.youtube.com/@Jakubjarz%C4%85bek-x7f/shorts" target="_blank">➤ Przejdź do kanału</a>
+            `;
+            return;
+        }
+
+        articles.innerHTML = "<h3>Artykuły</h3>" + list.map(t => `
+            <div class="article-box">${t}</div>
+        `).join("");
+    }
+
+    // -------------------------
+    // MAILTO — wysyłanie info
+    // -------------------------
+    function sendEmail(title) {
+        const email = "wasilewskibartosz879@gmail.com";
+        const subject = "Dodano nowy artykuł";
+        const body = "Dodano nowy artykuł: " + title;
+
+        window.location.href =
+            `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    }
+</script>
+</body>
+</html>
